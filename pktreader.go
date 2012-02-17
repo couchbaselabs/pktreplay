@@ -149,7 +149,7 @@ func consumer(name string, ch *bytesource) {
 	for bytes := range ch.ch {
 		dnu += uint64(len(bytes))
 	}
-	log.Printf("Completed %d messages, did not understand %s from %s",
+	log.Printf("Processed %d messages, skipped %s from %s",
 		msgs, humanize.Bytes(dnu), name)
 	ch.reporter <- reportMsg{final: true, dnu: dnu}
 }
