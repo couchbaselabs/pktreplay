@@ -255,6 +255,7 @@ func report(ch <-chan reportMsg, wg *sync.WaitGroup) {
 }
 
 func main() {
+	log.SetFlags(log.Lmicroseconds)
 	flag.Parse()
 	memcached.MaxBodyLen = uint32(*maxBodyLen)
 	reportchan := make(chan reportMsg, 100000)
