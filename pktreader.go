@@ -80,6 +80,33 @@ func processRequest(name string, ch *bytesource, req *gomemcached.MCRequest) {
 	ch.reporter <- reportMsg{op: req.Opcode}
 }
 
+func looksValid(req *gomemcached.MCRequest) bool {
+
+	type validator func() bool
+
+	requirements := make(map[gomemcached.CommandCode][]validator)
+
+	saneKey := func() bool { return len(req.Key) >= 4 && len(req.Key) < 20 }
+	noBody := func() bool { return len(req.Body) == 0 }
+	hasBody := func() bool { return len(req.Body) > 0 }
+
+	requirements[gomemcached.GET] = []validator{saneKey, noBody}
+	requirements[gomemcached.GETQ] = []validator{saneKey, noBody}
+	requirements[gomemcached.DELETE] = []validator{saneKey, noBody}
+	requirements[gomemcached.SET] = []validator{saneKey, hasBody}
+	requirements[gomemcached.SETQ] = []validator{saneKey, hasBody}
+
+	if validators, ok := requirements[req.Opcode]; ok {
+		for _, v := range validators {
+			if !v() {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
 func consumer(name string, ch *bytesource) {
 	defer childrenWG.Done()
 	msgs := 0
@@ -90,17 +117,10 @@ func consumer(name string, ch *bytesource) {
 		pkt, err := memcached.ReadPacket(rd)
 		switch {
 		case err == nil:
-			switch pkt.Opcode {
-			case gomemcached.GET, gomemcached.SET, gomemcached.GETQ,
-				gomemcached.SETQ, gomemcached.DELETE:
-				if len(pkt.Key) > 16 || len(pkt.Key) < 4 {
-					fmt.Printf("Weird invalid looking packet: %v\n", pkt)
-				} else {
-					processRequest(name, ch, &pkt)
-				}
-			default:
-				// not weird, invalid looking request
+			if looksValid(&pkt) {
 				processRequest(name, ch, &pkt)
+			} else {
+				fmt.Printf("Invalid request found: %v\n", pkt)
 			}
 			msgs++
 		default:
