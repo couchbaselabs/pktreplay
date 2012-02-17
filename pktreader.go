@@ -126,22 +126,28 @@ func consumer(name string, ch *bytesource) {
 	ch.reporter <- reportMsg{final: true, dnu: dnu}
 }
 
-func syncTime(pktTime, firstPacket, localStart time.Time) {
+func timeOffset(pktTime, firstPacket, localStart time.Time) time.Duration {
 	now := time.Now()
 	pktElapsed := pktTime.Sub(firstPacket)
 	localElapsed := time.Duration(float64(now.Sub(localStart)) * *timeScale)
 
-	toSleep := time.Duration(float64(pktElapsed-localElapsed) / *timeScale)
+	return time.Duration(float64(pktElapsed-localElapsed) / *timeScale)
+
+}
+
+func syncTime(pktTime, firstPacket, localStart time.Time) {
+	toSleep := timeOffset(pktTime, firstPacket, localStart)
 	if toSleep > 0 {
 		time.Sleep(toSleep)
 	}
 }
 
-func stream(filename string, rchan chan<- reportMsg) {
+// Returns how far off schedule we were
+func stream(filename string, rchan chan<- reportMsg) time.Duration {
 	h, err := pcap.Openoffline(filename)
 	if h == nil {
 		fmt.Printf("Openoffline(%s) failed: %s\n", filename, err)
-		return
+		os.Exit(1)
 	}
 	defer h.Close()
 
@@ -151,10 +157,11 @@ func stream(filename string, rchan chan<- reportMsg) {
 	pkt := h.Next()
 	if pkt == nil {
 		fmt.Printf("No packets.")
-		return
+		os.Exit(1)
 	}
 	started := time.Now()
 	first := pkt.Time.Time()
+	var pktTime time.Time
 
 	for ; pkt != nil; pkt = h.Next() {
 		pkt.Decode()
@@ -187,12 +194,13 @@ func stream(filename string, rchan chan<- reportMsg) {
 				}
 			}
 		}
-		t := pkt.Time.Time()
-		syncTime(t, first, started)
+		pktTime = pkt.Time.Time()
+		syncTime(pktTime, first, started)
 	}
 	for _, ch := range clients {
 		close(ch)
 	}
+	return timeOffset(pktTime, first, started)
 }
 
 func report(ch <-chan reportMsg, wg *sync.WaitGroup) {
@@ -226,8 +234,15 @@ func main() {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go report(reportchan, &wg)
-	stream(flag.Arg(0), reportchan)
+	toff := stream(flag.Arg(0), reportchan)
 	childrenWG.Wait()
 	close(reportchan)
 	wg.Wait()
+	tlbl := "early"
+	if int64(toff) < 0 {
+		tlbl = "late"
+		toff = 0 - toff
+	}
+	fmt.Printf("Finished %v %s.\n", toff, tlbl)
+
 }
