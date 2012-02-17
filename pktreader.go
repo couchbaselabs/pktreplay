@@ -18,6 +18,8 @@ import (
 
 var timeScale *float64 = flag.Float64("timescale", 1.0,
 	"The device that speeds up and slows down time")
+var packetRecovery *bool = flag.Bool("recover", true,
+	"Attempt to recover from corrupt memcached streams")
 
 const channelSize = 10000
 
@@ -124,14 +126,17 @@ func consumer(name string, ch *bytesource) {
 			}
 			msgs++
 		default:
-			// fmt.Printf("recovering from error:  %v\n", err)
-			skipped, err := readUntil(rd, gomemcached.REQ_MAGIC)
-			dnu += skipped
-			if err != nil {
-				ever = false
-				if err != io.EOF {
-					fmt.Printf("Got an error seeking truth: %v", err)
+			if *packetRecovery {
+				skipped, err := readUntil(rd, gomemcached.REQ_MAGIC)
+				dnu += skipped
+				if err != nil {
+					ever = false
+					if err != io.EOF {
+						fmt.Printf("Got an error seeking truth: %v", err)
+					}
 				}
+			} else {
+				ever = false
 			}
 		case err == io.EOF:
 			ever = false
