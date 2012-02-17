@@ -124,6 +124,7 @@ func looksValid(req *gomemcached.MCRequest) bool {
 }
 
 func mcResponseConsumer(client *mc.Client) {
+	defer childrenWG.Done()
 	for {
 		res := client.Receive()
 		if res.Status != 0 {
@@ -141,6 +142,7 @@ func consumer(name string, ch *bytesource) {
 		client, err = mc.Connect("tcp", *server)
 		if err == nil {
 			defer client.Close()
+			childrenWG.Add(1)
 			go mcResponseConsumer(client)
 		} else {
 			log.Printf("Error connecting to memcached server: %v", err)
