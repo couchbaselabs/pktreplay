@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -22,6 +23,8 @@ var timeScale *float64 = flag.Float64("timescale", 1.0,
 	"The device that speeds up and slows down time")
 var packetRecovery *bool = flag.Bool("recover", true,
 	"Attempt to recover from corrupt memcached streams")
+var dumpJson *bool = flag.Bool("dumpjson", false,
+	"Dump op -> vbucket map discovered in trace")
 var maxBodyLen *uint = flag.Uint("maxBodyLen", uint(memcached.MaxBodyLen),
 	"Maximum body length of a valid packet")
 var server *string = flag.String("server", "localhost:11211",
@@ -33,7 +36,7 @@ var childrenWG = sync.WaitGroup{}
 
 type reportMsg struct {
 	final bool
-	op    gomemcached.CommandCode
+	req   *gomemcached.MCRequest
 	dnu   uint64
 }
 
@@ -90,7 +93,7 @@ func processRequest(name string, ch *bytesource, req *gomemcached.MCRequest,
 		client.Transmit(req)
 	}
 	// log.Printf("from %v: %v", name, pkt)
-	ch.reporter <- reportMsg{op: req.Opcode}
+	ch.reporter <- reportMsg{req: req}
 }
 
 func looksValid(req *gomemcached.MCRequest) bool {
@@ -259,14 +262,33 @@ func stream(filename string, rchan chan<- reportMsg) time.Duration {
 	return timeOffset(pktTime, first, started)
 }
 
+func has(haystack []int, needle int) bool {
+	for _, v := range haystack {
+		if v == needle {
+			return true
+		}
+	}
+	return false
+}
+
 func report(ch <-chan reportMsg, wg *sync.WaitGroup) {
 	counts := [256]uint64{}
 	var dnu uint64
+	vbuckets := map[string][]int{}
 	for msg := range ch {
-		if msg.final {
-			dnu += msg.dnu
+		if msg.req != nil {
+			counts[int(msg.req.Opcode)]++
+			vb := int(msg.req.VBucket)
+			ops := msg.req.Opcode.String()
+			if l, ok := vbuckets[ops]; ok {
+				if !has(l, vb) {
+					vbuckets[ops] = append(l, vb)
+				}
+			} else {
+				vbuckets[ops] = []int{vb}
+			}
 		} else {
-			counts[int(msg.op)]++
+			dnu += msg.dnu
 		}
 	}
 
@@ -278,6 +300,14 @@ func report(ch <-chan reportMsg, wg *sync.WaitGroup) {
 		}
 	}
 	tw.Flush()
+
+	if *dumpJson {
+		log.Printf("Vbuckets in use:")
+		err := json.NewEncoder(os.Stdout).Encode(vbuckets)
+		if err != nil {
+			log.Printf("Error in JSON encoding:  %v", err)
+		}
+	}
 
 	log.Printf("Did not understand %s bytes", humanize.Bytes(dnu))
 
