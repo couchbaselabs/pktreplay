@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -80,7 +81,7 @@ func readUntil(r *bufio.Reader, b byte) (skipped uint64, err error) {
 }
 
 func processRequest(name string, ch *bytesource, req *gomemcached.MCRequest) {
-	// fmt.Printf("from %v: %v\n", name, pkt)
+	// log.Printf("from %v: %v", name, pkt)
 	ch.reporter <- reportMsg{op: req.Opcode}
 }
 
@@ -124,7 +125,7 @@ func consumer(name string, ch *bytesource) {
 			if looksValid(&pkt) {
 				processRequest(name, ch, &pkt)
 			} else {
-				fmt.Printf("Invalid request found: %v\n", pkt)
+				log.Printf("Invalid request found: %v", pkt)
 			}
 			msgs++
 		default:
@@ -134,7 +135,7 @@ func consumer(name string, ch *bytesource) {
 				if err != nil {
 					ever = false
 					if err != io.EOF {
-						fmt.Printf("Got an error seeking truth: %v", err)
+						log.Printf("Got an error seeking truth: %v", err)
 					}
 				}
 			} else {
@@ -148,7 +149,7 @@ func consumer(name string, ch *bytesource) {
 	for bytes := range ch.ch {
 		dnu += uint64(len(bytes))
 	}
-	fmt.Printf("Completed %d messages, did not understand %s from %s\n",
+	log.Printf("Completed %d messages, did not understand %s from %s",
 		msgs, humanize.Bytes(dnu), name)
 	ch.reporter <- reportMsg{final: true, dnu: dnu}
 }
@@ -173,8 +174,7 @@ func syncTime(pktTime, firstPacket, localStart time.Time) {
 func stream(filename string, rchan chan<- reportMsg) time.Duration {
 	h, err := pcap.Openoffline(filename)
 	if h == nil {
-		fmt.Printf("Openoffline(%s) failed: %s\n", filename, err)
-		os.Exit(1)
+		log.Fatalf("Openoffline(%s) failed: %s", filename, err)
 	}
 	defer h.Close()
 
@@ -183,8 +183,7 @@ func stream(filename string, rchan chan<- reportMsg) time.Duration {
 
 	pkt := h.Next()
 	if pkt == nil {
-		fmt.Printf("No packets.")
-		os.Exit(1)
+		log.Fatal("No packets.")
 	}
 	started := time.Now()
 	first := pkt.Time.Time()
@@ -209,7 +208,7 @@ func stream(filename string, rchan chan<- reportMsg) time.Duration {
 					childrenWG.Add(1)
 					go consumer(sender, NewByteSource(ch, rchan))
 					clients[sender] = ch
-					// fmt.Printf("Inferred connect from " + sender + "\n")
+					// log.Printf("Inferred connect from " + sender)
 				}
 				if len(pkt.Payload) > 0 {
 					ch <- pkt.Payload
@@ -217,7 +216,7 @@ func stream(filename string, rchan chan<- reportMsg) time.Duration {
 				if tcp.Flags&(pcap.TCP_SYN|pcap.TCP_RST) != 0 && !isAck {
 					close(clients[sender])
 					delete(clients, sender)
-					// fmt.Printf("Disconnect from " + sender + "\n")
+					// log.Printf("Disconnect from " + sender)
 				}
 			}
 		}
@@ -250,7 +249,7 @@ func report(ch <-chan reportMsg, wg *sync.WaitGroup) {
 	}
 	tw.Flush()
 
-	fmt.Printf("Did not understand %s bytes\n", humanize.Bytes(dnu))
+	log.Printf("Did not understand %s bytes", humanize.Bytes(dnu))
 
 	wg.Done()
 }
@@ -271,6 +270,6 @@ func main() {
 		tlbl = "late"
 		toff = 0 - toff
 	}
-	fmt.Printf("Finished %v %s.\n", toff, tlbl)
+	log.Printf("Finished %v %s.", toff, tlbl)
 
 }
