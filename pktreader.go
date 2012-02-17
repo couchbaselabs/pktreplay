@@ -20,6 +20,8 @@ var timeScale *float64 = flag.Float64("timescale", 1.0,
 	"The device that speeds up and slows down time")
 var packetRecovery *bool = flag.Bool("recover", true,
 	"Attempt to recover from corrupt memcached streams")
+var maxBodyLen *uint = flag.Uint("maxBodyLen", uint(memcached.MaxBodyLen),
+	"Maximum body length of a valid packet")
 
 const channelSize = 10000
 
@@ -255,6 +257,7 @@ func report(ch <-chan reportMsg, wg *sync.WaitGroup) {
 
 func main() {
 	flag.Parse()
+	memcached.MaxBodyLen = uint32(*maxBodyLen)
 	reportchan := make(chan reportMsg, 100000)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
