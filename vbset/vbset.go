@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"encoding/json"
+	"io"
 	"log"
 	"os"
 	"sync"
@@ -22,7 +23,13 @@ const (
 func responseReader(client *memcached.Client) {
 	defer wg.Done()
 	for ; todo > 0; todo-- {
-		res := client.Receive()
+		res, err := client.Receive()
+		if err != nil {
+			if err != io.EOF {
+				log.Printf("Error in reader: %v", err)
+			}
+			return
+		}
 		if res.Status != 0 {
 			log.Printf("Read error: %v", res)
 		}
