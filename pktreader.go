@@ -318,7 +318,18 @@ func report(ch <-chan reportMsg, wg *sync.WaitGroup) {
 
 func main() {
 	log.SetFlags(log.Lmicroseconds)
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [params] file.pcap\n",
+			os.Args[0])
+		flag.PrintDefaults()
+	}
+
 	flag.Parse()
+	if flag.NArg() < 1 {
+		fmt.Fprintf(os.Stderr, "ERROR:  Must supply a pcap file.\n")
+		flag.Usage()
+		os.Exit(1)
+	}
 	memcached.MaxBodyLen = uint32(*maxBodyLen)
 	reportchan := make(chan reportMsg, 100000)
 	wg := sync.WaitGroup{}
