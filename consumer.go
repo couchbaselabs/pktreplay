@@ -98,7 +98,13 @@ func looksValid(req *gomemcached.MCRequest) bool {
 func mcResponseConsumer(client *mc.Client) {
 	defer childrenWG.Done()
 	for {
-		res := client.Receive()
+		res, err := client.Receive()
+		if err != nil {
+			if err != io.EOF {
+				log.Printf("Error in receive.  I think we're done: %v", err)
+			}
+			return
+		}
 		if res.Status != 0 {
 			log.Printf("Memcached error:  %v", res)
 		}
