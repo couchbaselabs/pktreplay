@@ -10,6 +10,7 @@ import (
 
 	"github.com/dustin/gomemcached/server"
 	"github.com/dustin/gopcap"
+	"github.com/dustin/replaykit"
 )
 
 var timeScale *float64 = flag.Float64("timescale", 1.0,
@@ -27,11 +28,20 @@ const channelSize = 10000
 
 var childrenWG = sync.WaitGroup{}
 
-func syncTime(pktTime, firstPacket, localStart time.Time) {
-	toSleep := timeOffset(pktTime, firstPacket, localStart)
-	if toSleep > 0 {
-		time.Sleep(toSleep)
-	}
+type packetEvent struct {
+	pc *pcap.Packet
+}
+
+type pktSrc struct {
+	p *pcap.Pcap
+}
+
+func (pe packetEvent) TS() time.Time {
+	return pe.pc.Time.Time()
+}
+
+func (p *pktSrc) Next() replay.Event {
+	return packetEvent{p.p.Next()}
 }
 
 // Returns how far off schedule we were
@@ -45,15 +55,18 @@ func stream(filename string, rchan chan<- reportMsg) time.Duration {
 	clients := make(map[string]chan []byte)
 	servers := make(map[string]bool)
 
-	pkt := h.Next()
-	if pkt == nil {
-		log.Fatal("No packets.")
-	}
-	started := time.Now()
-	first := pkt.Time.Time()
-	var pktTime time.Time
+	defer func() {
+		for _, ch := range clients {
+			close(ch)
+		}
+	}()
 
-	for ; pkt != nil; pkt = h.Next() {
+	psrc := &pktSrc{h}
+
+	r := replay.New(*timeScale)
+
+	return r.Run(psrc, replay.FunctionAction(func(ev replay.Event) {
+		pkt := ev.(packetEvent).pc
 		pkt.Decode()
 		tcp, ip := pkt.TCP, pkt.IP
 		if tcp != nil {
@@ -84,13 +97,7 @@ func stream(filename string, rchan chan<- reportMsg) time.Duration {
 				}
 			}
 		}
-		pktTime = pkt.Time.Time()
-		syncTime(pktTime, first, started)
-	}
-	for _, ch := range clients {
-		close(ch)
-	}
-	return timeOffset(pktTime, first, started)
+	}))
 }
 
 func main() {
