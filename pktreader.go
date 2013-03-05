@@ -42,7 +42,11 @@ func (pe packetEvent) TS() time.Time {
 }
 
 func (p *pktSrc) Next() replay.Event {
-	return packetEvent{p.p.Next()}
+	n := p.p.Next()
+	if n == nil {
+		return nil
+	}
+	return packetEvent{n}
 }
 
 // Returns how far off schedule we were
