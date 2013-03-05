@@ -155,7 +155,8 @@ func consumer(name string, ch *bytesource) {
 			if looksValid(&pkt) {
 				processRequest(name, ch, &pkt, client)
 			} else {
-				log.Printf("Invalid request found: %v", pkt)
+				log.Printf("Invalid request found: op=%v, klen=%v, bodylen=%v",
+					pkt.Opcode, len(pkt.Key), len(pkt.Body))
 			}
 			msgs++
 		default:
