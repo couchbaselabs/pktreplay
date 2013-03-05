@@ -68,27 +68,25 @@ func processRequest(name string, ch *bytesource, req *gomemcached.MCRequest,
 	ch.reporter <- reportMsg{req: req}
 }
 
+type validator func(*gomemcached.MCRequest) bool
+
+func saneKey(req *gomemcached.MCRequest) bool { return len(req.Key) >= 4 && len(req.Key) < 250 }
+func noBody(req *gomemcached.MCRequest) bool  { return len(req.Body) == 0 }
+func hasBody(req *gomemcached.MCRequest) bool { return len(req.Body) > 0 }
+
+var validators = map[gomemcached.CommandCode][]validator{
+	gomemcached.GET:    []validator{saneKey, noBody},
+	gomemcached.GETQ:   []validator{saneKey, noBody},
+	gomemcached.DELETE: []validator{saneKey, noBody},
+	gomemcached.SET:    []validator{saneKey, hasBody},
+	gomemcached.SETQ:   []validator{saneKey, hasBody},
+}
+
 func looksValid(req *gomemcached.MCRequest) bool {
 
-	type validator func() bool
-
-	requirements := make(map[gomemcached.CommandCode][]validator)
-
-	saneKey := func() bool { return len(req.Key) >= 4 && len(req.Key) < 20 }
-	noBody := func() bool { return len(req.Body) == 0 }
-	hasBody := func() bool { return len(req.Body) > 0 }
-
-	requirements[gomemcached.GET] = []validator{saneKey, noBody}
-	requirements[gomemcached.GETQ] = []validator{saneKey, noBody}
-	requirements[gomemcached.DELETE] = []validator{saneKey, noBody}
-	requirements[gomemcached.SET] = []validator{saneKey, hasBody}
-	requirements[gomemcached.SETQ] = []validator{saneKey, hasBody}
-
-	if validators, ok := requirements[req.Opcode]; ok {
-		for _, v := range validators {
-			if !v() {
-				return false
-			}
+	for _, v := range validators[req.Opcode] {
+		if !v(req) {
+			return false
 		}
 	}
 
