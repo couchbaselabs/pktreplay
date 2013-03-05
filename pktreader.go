@@ -13,15 +13,15 @@ import (
 	"github.com/dustin/replaykit"
 )
 
-var timeScale *float64 = flag.Float64("timescale", 1.0,
+var timeScale = flag.Float64("timescale", 1.0,
 	"The device that speeds up and slows down time")
-var packetRecovery *bool = flag.Bool("recover", true,
+var packetRecovery = flag.Bool("recover", true,
 	"Attempt to recover from corrupt memcached streams")
-var dumpJson *bool = flag.Bool("dumpjson", false,
+var dumpJson = flag.Bool("dumpjson", false,
 	"Dump op -> vbucket map discovered in trace")
-var maxBodyLen *uint = flag.Uint("maxBodyLen", uint(memcached.MaxBodyLen),
+var maxBodyLen = flag.Uint("maxBodyLen", uint(memcached.MaxBodyLen),
 	"Maximum body length of a valid packet")
-var server *string = flag.String("server", "localhost:11211",
+var server = flag.String("server", "localhost:11211",
 	"memcached server to connect to")
 var verbose = flag.Bool("v", false, "print out all the things")
 
