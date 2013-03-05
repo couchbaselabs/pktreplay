@@ -23,6 +23,7 @@ var maxBodyLen *uint = flag.Uint("maxBodyLen", uint(memcached.MaxBodyLen),
 	"Maximum body length of a valid packet")
 var server *string = flag.String("server", "localhost:11211",
 	"memcached server to connect to")
+var verbose = flag.Bool("v", false, "print out all the things")
 
 const channelSize = 10000
 

@@ -60,7 +60,10 @@ func readUntil(r *bufio.Reader, b byte) (skipped uint64, err error) {
 
 func processRequest(name string, ch *bytesource, req *gomemcached.MCRequest,
 	client *mc.Client) {
-	// log.Printf("Transmitting %v", *req)
+
+	if *verbose {
+		log.Printf("%v", *req)
+	}
 	if client != nil {
 		client.Transmit(req)
 	}
