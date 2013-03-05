@@ -5,6 +5,8 @@ import (
 	"io"
 	"log"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/dustin/go-humanize"
 	"github.com/dustin/gomemcached"
@@ -73,7 +75,21 @@ func processRequest(name string, ch *bytesource, req *gomemcached.MCRequest,
 
 type validator func(*gomemcached.MCRequest) bool
 
-func saneKey(req *gomemcached.MCRequest) bool { return len(req.Key) >= 4 && len(req.Key) < 250 }
+func allArePrintable(s string) bool {
+	for _, r := range s {
+		if !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func saneKey(req *gomemcached.MCRequest) bool {
+	return len(req.Key) >= 1 &&
+		len(req.Key) < 250 &&
+		utf8.Valid(req.Key) &&
+		allArePrintable(string(req.Key))
+}
 func noBody(req *gomemcached.MCRequest) bool  { return len(req.Body) == 0 }
 func hasBody(req *gomemcached.MCRequest) bool { return len(req.Body) > 0 }
 
