@@ -94,11 +94,11 @@ func noBody(req *gomemcached.MCRequest) bool  { return len(req.Body) == 0 }
 func hasBody(req *gomemcached.MCRequest) bool { return len(req.Body) > 0 }
 
 var validators = map[gomemcached.CommandCode][]validator{
-	gomemcached.GET:    []validator{saneKey, noBody},
-	gomemcached.GETQ:   []validator{saneKey, noBody},
-	gomemcached.DELETE: []validator{saneKey, noBody},
-	gomemcached.SET:    []validator{saneKey, hasBody},
-	gomemcached.SETQ:   []validator{saneKey, hasBody},
+	gomemcached.GET:    {saneKey, noBody},
+	gomemcached.GETQ:   {saneKey, noBody},
+	gomemcached.DELETE: {saneKey, noBody},
+	gomemcached.SET:    {saneKey, hasBody},
+	gomemcached.SETQ:   {saneKey, hasBody},
 }
 
 func looksValid(req *gomemcached.MCRequest) bool {
