@@ -99,6 +99,8 @@ var validators = map[gomemcached.CommandCode][]validator{
 	gomemcached.DELETE: {saneKey, noBody},
 	gomemcached.SET:    {saneKey, hasBody},
 	gomemcached.SETQ:   {saneKey, hasBody},
+	gomemcached.ADD:    {saneKey, hasBody},
+	gomemcached.ADDQ:   {saneKey, hasBody},
 }
 
 func looksValid(req *gomemcached.MCRequest) bool {
