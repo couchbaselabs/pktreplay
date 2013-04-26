@@ -103,7 +103,12 @@ var validators = map[gomemcached.CommandCode][]validator{
 
 func looksValid(req *gomemcached.MCRequest) bool {
 
-	for _, v := range validators[req.Opcode] {
+	vs, ok := validators[req.Opcode]
+	if !ok {
+		return false
+	}
+
+	for _, v := range vs {
 		if !v(req) {
 			return false
 		}
